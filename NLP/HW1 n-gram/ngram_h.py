@@ -100,6 +100,9 @@ def words_to_indices(vocabulary: Dict[str, int], sentence: Sentence) -> IntSente
     #def __delitem__(self, key: Gram):
         #pass
 
+import math
+
+
 class NGramModel:
     def __init__(self, vocab_size: int, n: int = 4):
         """
@@ -113,19 +116,21 @@ class NGramModel:
         self.vocab_size: int = vocab_size
         self.n: int = n
 
-        self.frequencies: List[Dict[Gram, int]]\
+        # 用self.disfrequencies存储词频统计后结果
+        self.frequencies: List[Dict[Gram, int]] \
             = [{} for _ in range(n)]
-        self.disfrequencies: List[Dict[Gram, int]]\
+        self.disfrequencies: List[Dict[Gram, int]] \
             = [{} for _ in range(n)]
-        #self.frequencies: DictTree = DictTree()
 
-        self.ncounts: Dict[ Gram
-                          , Dict[int, int]
-                          ] = {}
+        self.Nr_cnt = {}  # 以出现次数为索引记录不同出现次数gram的个数
 
-        self.discount_threshold:int = 7
+        self.ncounts: Dict[Gram
+        , (int, int, int)  # 按照gram: r, N_r, N_(r+1)的格式来记录
+        ] = {}
+
+        self.discount_threshold: int = 7
         self._d: Dict[Gram, Tuple[float, float]] = {}
-        self._alpha: List[Dict[Gram, float]]\
+        self._alpha: List[Dict[Gram, float]] \
             = [{} for _ in range(n)]
 
         self.eps = 1e-10
@@ -138,22 +143,65 @@ class NGramModel:
             corpus - list of list of int
         """
 
+        # self.n: lenth of n-gram
         for stc in corpus:
-            for i in range(1, len(stc)+1):
+            for i in range(1, len(stc) + 1):  # start from point i, 0th not counted
                 for j in range(min(i, self.n)):
                     # TODO: count the frequencies of the grams
-                    pass
+                    # len of gram = j
+                    #                     if (i+j)<=len(stc) :
+                    tmp_gram = stc[i:i + j + 1]
+                    tmp_gram = tuple(tmp_gram)
+                    if self.frequencies[j].get(tmp_gram, 0):
+                        self.frequencies[j][tmp_gram] = self.frequencies[j][tmp_gram] + 1
+                    else:
+                        self.frequencies[j][tmp_gram] = 1
+                    # print(self.frequencies[j][tmp_gram])
+        # print(self.frequencies[1])
 
-        for i in range(1, self.n):
+        for i in range(1, self.n):  # 按照gram长度划分
+            # for key, value in self.frequencies[i].items():
+            #     print(key[:-1])
+            #     print(value)
+
             grams = itertools.groupby(
+                sorted(
                     sorted(
-                        sorted(
-                            map(lambda itm: (itm[0][:-1], itm[1]),
-                                 self.frequencies[i].items()),
-                               key=(lambda itm: itm[1])),
-                        key=(lambda itm: itm[0])))
+                        map(lambda itm: (itm[0][:-1], itm[1]),  # 长度为i的gram内(最后一项，)的键值对， 按照频率从小到大排序
+                            self.frequencies[i].items()),
+                        key=(lambda itm: itm[1])),
+                    key=(lambda itm: itm[0])))  # 再按照第一位元素排序， 后面的值为频率
             # TODO: calculates the value of $N_r$
-            pass
+
+            flag = False
+            for key, group in grams:  # key[0]表示值, key[1]表示出现次数
+                # print(key[0], key[1])
+
+                cnt = 0
+                for item in group:
+                    print(item)
+                    cnt = cnt + 1
+
+                self.Nr_cnt[key[1]] = cnt
+
+
+        # 为每个gram赋值, 23:30思路：直接在上面的函数改写
+        for i in range(1, self.n):
+            tmp_list = [0, 0, 0]  # (r, Nr, Nr+1)
+            # print(self.frequencies[i])
+            for (key, value) in zip(self.frequencies[i].keys(), self.frequencies[i].values()):  # key:gram , value:词频
+                value = int(value)
+                print(key, value, 'dealing')
+                tmp_list[0] = value
+                tmp_list[1] = self.Nr_cnt[value]
+
+                tmp_list[2] = 0
+                print(key[1])
+                tmp_list[2] = self.Nr_cnt[key[1]+1]
+
+
+                tmp_tuple = tuple(tmp_list)
+                self.ncounts[key] = tmp_tuple
 
     def d(self, gram: Gram) -> float:
         """
@@ -169,7 +217,7 @@ class NGramModel:
         if gram not in self._d:
             # TODO: calculates the value of $d'$
             pass
-            self._d[gram] = (numerator1/denominator, - numerator2/denominator)
+            self._d[gram] = (numerator1 / denominator, - numerator2 / denominator)
         return self._d[gram]
 
     def alpha(self, gram: Gram) -> float:
@@ -185,15 +233,15 @@ class NGramModel:
 
         n = len(gram)
         if gram not in self._alpha[n]:
-            if gram in self.frequencies[n-1]:
+            if gram in self.frequencies[n - 1]:
                 # TODO: calculates the value of $\alpha$
                 pass
-                self._alpha[n][gram] = numerator/denominator
+                self._alpha[n][gram] = numerator / denominator
             else:
                 self._alpha[n][gram] = 1.
         return self._alpha[n][gram]
 
-    def __getitem__(self, gram: Gram) -> float:
+    def __getitem__(self, gram: Gram) -> float:  # 计算回退概率(调用之前实现的函数)
         """
         Calculates smoothed conditional probability P(`gram[-1]`|`gram[:-1]`).
 
@@ -204,13 +252,13 @@ class NGramModel:
             float
         """
 
-        n = len(gram)-1
+        n = len(gram) - 1
         if gram not in self.disfrequencies[n]:
-            if n>0:
+            if n > 0:
                 # TODO: calculates the smoothed probability value according to the formulae
                 pass
             else:
-                self.disfrequencies[n][gram] = self.frequencies[n].get(gram, self.eps)/float(len(self.frequencies[0]))
+                self.disfrequencies[n][gram] = self.frequencies[n].get(gram, self.eps) / float(len(self.frequencies[0]))
         return self.disfrequencies[n][gram]
 
     def log_prob(self, sentence: IntSentence) -> float:
@@ -226,7 +274,7 @@ class NGramModel:
         """
 
         log_prob = 0.
-        for i in range(2, len(sentence)+1):
+        for i in range(2, len(sentence) + 1):
             # TODO: calculates the log probability
             pass
         return log_prob
