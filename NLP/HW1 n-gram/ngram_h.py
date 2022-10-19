@@ -122,11 +122,10 @@ class NGramModel:
         self.disfrequencies: List[Dict[Gram, int]] \
             = [{} for _ in range(n)]
 
-        self.Nr_cnt = {}  # 以出现次数为索引记录不同出现次数gram的个数
 
-        self.ncounts: Dict[Gram
-        , (int, int, int)  # 按照gram: r, N_r, N_(r+1)的格式来记录
-        ] = {}
+        self.ncounts: Dict[ Gram
+                          , Dict[int, int]
+                          ] = {}
 
         self.discount_threshold: int = 7
         self._d: Dict[Gram, Tuple[float, float]] = {}
@@ -145,64 +144,51 @@ class NGramModel:
 
         # self.n: lenth of n-gram
         for stc in corpus:
-            for i in range(1, len(stc) + 1):  # start from point i, 0th not counted
-                for j in range(min(i, self.n)):
+            # print(stc)
+            for i in range(1, len(stc) + 1):  # 查看到i为止的序列
+                for j in range(min(i, self.n)):  # 以j作为gram的迭代
                     # TODO: count the frequencies of the grams
-                    # len of gram = j
-                    #                     if (i+j)<=len(stc) :
-                    tmp_gram = stc[i:i + j + 1]
+                    tmp_gram = stc[i-j-1:i]
                     tmp_gram = tuple(tmp_gram)
                     if self.frequencies[j].get(tmp_gram, 0):
                         self.frequencies[j][tmp_gram] = self.frequencies[j][tmp_gram] + 1
+
+                        # print(self.frequencies[j][tmp_gram])
                     else:
                         self.frequencies[j][tmp_gram] = 1
+
                     # print(self.frequencies[j][tmp_gram])
         # print(self.frequencies[1])
 
-        for i in range(1, self.n):  # 按照gram长度划分
-            # for key, value in self.frequencies[i].items():
-            #     print(key[:-1])
-            #     print(value)
 
+        for i in range(1, self.n):  # 按照gram长度划分
             grams = itertools.groupby(
                 sorted(
                     sorted(
-                        map(lambda itm: (itm[0][:-1], itm[1]),  # 长度为i的gram内(最后一项，)的键值对， 按照频率从小到大排序
+                        map(lambda itm: (itm[0][:-1], itm[1]),  # 去除最后一项后的键值对
                             self.frequencies[i].items()),
                         key=(lambda itm: itm[1])),
                     key=(lambda itm: itm[0])))  # 再按照第一位元素排序， 后面的值为频率
             # TODO: calculates the value of $N_r$
 
-            flag = False
-            for key, group in grams:  # key[0]表示值, key[1]表示出现次数
-                # print(key[0], key[1])
+            for key, group in grams:  # key[0]: 表示上一项的值, key[1]: 下一项出现频次
 
                 cnt = 0
-                for item in group:
-                    print(item)
-                    cnt = cnt + 1
+                for _ in group:
+                    cnt = cnt+1
 
-                self.Nr_cnt[key[1]] = cnt
+                if key[0] in self.ncounts:
+                    self.ncounts[key[0]][key[1]] = cnt  # 上一长度gram: (多一个元素所有可能的频次: 该频次的出现次数)
+                else:
+                    self.ncounts[key[0]] = {}
+                    self.ncounts[key[0]][key[1]] = cnt
 
+                # 记录了: 对本项(key)，可能的下一项的(r , N_r)
 
-        # 为每个gram赋值, 23:30思路：直接在上面的函数改写
-        for i in range(1, self.n):
-            tmp_list = [0, 0, 0]  # (r, Nr, Nr+1)
-            # print(self.frequencies[i])
-            for (key, value) in zip(self.frequencies[i].keys(), self.frequencies[i].values()):  # key:gram , value:词频
-                value = int(value)
-                print(key, value, 'dealing')
-                tmp_list[0] = value
-                tmp_list[1] = self.Nr_cnt[value]
+        return self.frequencies
 
-                tmp_list[2] = 0
-                print(key[1])
-                tmp_list[2] = self.Nr_cnt[key[1]+1]
-
-
-                tmp_tuple = tuple(tmp_list)
-                self.ncounts[key] = tmp_tuple
-
+    # 输入gram,计算其对应插值参数d
+    # func 'd' not debugged yet
     def d(self, gram: Gram) -> float:
         """
         Calculates the interpolation coefficient.
@@ -213,14 +199,36 @@ class NGramModel:
         Return:
             float
         """
+        # r即本gram的出现频次
+        length = len(gram)
+        r = self.frequencies[length][gram]
 
+        # 调用self.ncounts， 查看下一项的不同频次的出现次数
         if gram not in self._d:
             # TODO: calculates the value of $d'$
-            pass
-            self._d[gram] = (numerator1 / denominator, - numerator2 / denominator)
-        return self._d[gram]
+            ncounts = self.ncounts[gram[:-1]]  # 查看前缀, counts是存储频次的字典
 
-    def alpha(self, gram: Gram) -> float:
+            def counts(num):
+                if num in ncounts:
+                    return float(ncounts[num])
+                else:
+                    return float(0)
+
+            lamda = float( counts(1) / (counts(1) - 8 * counts(8)) )
+            N_r = counts(r)
+            N_r_plus1 = counts(r+1)
+            d_dot = lamda * ( (r+1)*N_r_plus1 ) / ( r*N_r ) + 1 - lamda   # 求出各项参数 及d'
+
+            self._d[gram] = (d_dot, 1.0)
+
+        # self._d[gram] = (numerator1 / denominator, - numerator2 / denominator)  # 10/19 ques ?
+
+        if r > 7:
+            return self._d[gram][1]
+        else:
+            return self._d[gram][0]
+
+    def alpha(self, gram: Gram) -> float:   # '回退' 意为降低gram大小要求
         """
         Calculates the back-off weight alpha(`gram`)
 
@@ -232,10 +240,27 @@ class NGramModel:
         """
 
         n = len(gram)
+        # 概率存放在 disfrequencies 内
         if gram not in self._alpha[n]:
             if gram in self.frequencies[n - 1]:
                 # TODO: calculates the value of $\alpha$
-                pass
+
+                V_plus = []
+                V_minus = []
+
+                for i in range(1, self.vocab_size):
+                    # 添加元素:查询V+和V-
+                    index = len(gram)-1  # 需要减一才是正确的长度   # 这一段 checked in test_funcs 10/19 21:35
+                    gram_add = list(gram[:-1])
+                    gram_add.append(i)
+                    gram_add = tuple(gram_add)
+
+                    if gram_add in self.frequencies[index]:
+                        V_plus.append(i)
+                    else:
+                        V_minus.append(i)
+
+
                 self._alpha[n][gram] = numerator / denominator
             else:
                 self._alpha[n][gram] = 1.
@@ -257,6 +282,8 @@ class NGramModel:
             if n > 0:
                 # TODO: calculates the smoothed probability value according to the formulae
                 pass
+
+            # 排除第一项情形
             else:
                 self.disfrequencies[n][gram] = self.frequencies[n].get(gram, self.eps) / float(len(self.frequencies[0]))
         return self.disfrequencies[n][gram]
