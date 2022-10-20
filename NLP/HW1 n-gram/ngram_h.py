@@ -20,6 +20,8 @@ Gram = Tuple[int]
 
 _splitor_pattern = re.compile(r"[^a-zA-Z']+|(?=')")
 _digit_pattern = re.compile(r"\d+")
+
+
 def normaltokenize(corpus: List[str]) -> Corpus:
     """
     Normalizes and tokenizes the sentences in `corpus`. Turns the letters into
@@ -34,15 +36,16 @@ def normaltokenize(corpus: List[str]) -> Corpus:
           sequence in a sentence from the original sentence list
     """
 
-    tokeneds = [ ["<s>"]
-               + list(
-                   filter(lambda tkn: len(tkn)>0,
-                       _splitor_pattern.split(
-                           _digit_pattern.sub("N", stc.lower()))))
-               + ["</s>"]
-                    for stc in corpus
-               ]
+    tokeneds = [["<s>"]
+                + list(
+        filter(lambda tkn: len(tkn) > 0,
+               _splitor_pattern.split(
+                   _digit_pattern.sub("N", stc.lower()))))
+                + ["</s>"]
+                for stc in corpus
+                ]
     return tokeneds
+
 
 def extract_vocabulary(corpus: Corpus) -> Dict[str, int]:
     """
@@ -58,10 +61,11 @@ def extract_vocabulary(corpus: Corpus) -> Dict[str, int]:
 
     vocabulary = set(itertools.chain.from_iterable(corpus))
     vocabulary = dict(
-            map(lambda itm: (itm[1], itm[0]),
-                enumerate(
-                    sorted(vocabulary))))
+        map(lambda itm: (itm[1], itm[0]),
+            enumerate(
+                sorted(vocabulary))))
     return vocabulary
+
 
 def words_to_indices(vocabulary: Dict[str, int], sentence: Sentence) -> IntSentence:
     """
@@ -77,28 +81,29 @@ def words_to_indices(vocabulary: Dict[str, int], sentence: Sentence) -> IntSente
 
     return list(map(lambda tkn: vocabulary.get(tkn, len(vocabulary)), sentence))
 
+
 # OPTIONAL: implement a DictTree instead of using a flattern dict
-#class DictTree:
-    #def __init__(self):
-        #pass
+# class DictTree:
+# def __init__(self):
+# pass
 #
-    #def __len__(self) -> int:
-        #pass
+# def __len__(self) -> int:
+# pass
 #
-    #def __iter__(self) -> Iterator[Gram]:
-        #pass
+# def __iter__(self) -> Iterator[Gram]:
+# pass
 #
-    #def __contains__(self, key: Gram):
-        #pass
+# def __contains__(self, key: Gram):
+# pass
 #
-    #def __getitem__(self, key: Gram) -> int:
-        #pass
+# def __getitem__(self, key: Gram) -> int:
+# pass
 #
-    #def __setitem__(self, key: Gram, frequency: int):
-        #pass
+# def __setitem__(self, key: Gram, frequency: int):
+# pass
 #
-    #def __delitem__(self, key: Gram):
-        #pass
+# def __delitem__(self, key: Gram):
+# pass
 
 import math
 
@@ -116,16 +121,16 @@ class NGramModel:
         self.vocab_size: int = vocab_size
         self.n: int = n
 
-        # 用self.disfrequencies存储词频统计后结果
         self.frequencies: List[Dict[Gram, int]] \
             = [{} for _ in range(n)]
-        self.disfrequencies: List[Dict[Gram, int]] \
+
+        # 我认为应该更改为float 10/20 11:17
+        self.disfrequencies: List[Dict[Gram, float]] \
             = [{} for _ in range(n)]
 
-
-        self.ncounts: Dict[ Gram
-                          , Dict[int, int]
-                          ] = {}
+        self.ncounts: Dict[Gram
+        , Dict[int, int]
+        ] = {}
 
         self.discount_threshold: int = 7
         self._d: Dict[Gram, Tuple[float, float]] = {}
@@ -148,7 +153,7 @@ class NGramModel:
             for i in range(1, len(stc) + 1):  # 查看到i为止的序列
                 for j in range(min(i, self.n)):  # 以j作为gram的迭代
                     # TODO: count the frequencies of the grams
-                    tmp_gram = stc[i-j-1:i]
+                    tmp_gram = stc[i - j - 1:i]
                     tmp_gram = tuple(tmp_gram)
                     if self.frequencies[j].get(tmp_gram, 0):
                         self.frequencies[j][tmp_gram] = self.frequencies[j][tmp_gram] + 1
@@ -159,7 +164,6 @@ class NGramModel:
 
                     # print(self.frequencies[j][tmp_gram])
         # print(self.frequencies[1])
-
 
         for i in range(1, self.n):  # 按照gram长度划分
             grams = itertools.groupby(
@@ -175,7 +179,7 @@ class NGramModel:
 
                 cnt = 0
                 for _ in group:
-                    cnt = cnt+1
+                    cnt = cnt + 1
 
                 if key[0] in self.ncounts:
                     self.ncounts[key[0]][key[1]] = cnt  # 上一长度gram: (多一个元素所有可能的频次: 该频次的出现次数)
@@ -201,23 +205,26 @@ class NGramModel:
         """
         # r即本gram的出现频次
         length = len(gram)
-        r = self.frequencies[length][gram]
+        r = self.frequencies[length].get(gram, self.eps)
 
         # 调用self.ncounts， 查看下一项的不同频次的出现次数
         if gram not in self._d:
+            # print(gram)
+            # print(gram[:-1])
             # TODO: calculates the value of $d'$
             ncounts = self.ncounts[gram[:-1]]  # 查看前缀, counts是存储频次的字典
+            # print(ncounts)
 
             def counts(num):
                 if num in ncounts:
                     return float(ncounts[num])
                 else:
-                    return float(0)
+                    return float(self.eps)  # 如有报错,改为0
 
-            lamda = float( counts(1) / (counts(1) - 8 * counts(8)) )
+            lamda = float(counts(1) / (counts(1) - 8 * counts(8)))
             N_r = counts(r)
-            N_r_plus1 = counts(r+1)
-            d_dot = lamda * ( (r+1)*N_r_plus1 ) / ( r*N_r ) + 1 - lamda   # 求出各项参数 及d'
+            N_r_plus1 = counts(r + 1)
+            d_dot = lamda * ((r + 1) * N_r_plus1) / (r * N_r) + 1 - lamda  # 求出各项参数 及d'
 
             self._d[gram] = (d_dot, 1.0)
 
@@ -228,7 +235,7 @@ class NGramModel:
         else:
             return self._d[gram][0]
 
-    def alpha(self, gram: Gram) -> float:   # '回退' 意为降低gram大小要求
+    def alpha(self, gram: Gram) -> float:  # '回退' 意为降低gram大小要求
         """
         Calculates the back-off weight alpha(`gram`)
 
@@ -245,21 +252,34 @@ class NGramModel:
             if gram in self.frequencies[n - 1]:
                 # TODO: calculates the value of $\alpha$
 
+                # V+, V- Accumulated, sum add
                 V_plus = []
                 V_minus = []
 
+                sum_pls = 0
+                sum_minus = 0
                 for i in range(1, self.vocab_size):
                     # 添加元素:查询V+和V-
-                    index = len(gram)-1  # 需要减一才是正确的长度   # 这一段 checked in test_funcs 10/19 21:35
-                    gram_add = list(gram[:-1])
+                    index = len(gram)  # 减一是原长度 checked in test_funcs 10/19 21:35
+                    gram_add = list(gram)
                     gram_add.append(i)
                     gram_add = tuple(gram_add)
 
                     if gram_add in self.frequencies[index]:
+                        print(gram_add)
+                        print(self.frequencies[index].get(gram_add, 0))
                         V_plus.append(i)
+                        sum_pls = sum_pls + self.disfrequencies[index].get(gram_add, 0)  # checked in test
+                        # sum_pls = sum_pls + self.disfrequencies[index].get(gram_add, 0)
                     else:
                         V_minus.append(i)
+                        gram_minus = gram_add[1:]
+                        index = index - 1
 
+                        sum_minus = sum_minus + self.disfrequencies[index - 1].get(gram_minus, self.eps)
+
+                numerator = 1 - sum_pls
+                denominator = 1 - sum_minus
 
                 self._alpha[n][gram] = numerator / denominator
             else:
@@ -278,16 +298,33 @@ class NGramModel:
         """
 
         n = len(gram) - 1
+
         if gram not in self.disfrequencies[n]:
             if n > 0:
-                # TODO: calculates the smoothed probability value according to the formulae
-                pass
+                # TODO: calculates the smoothed probability value according to the formulate
 
-            # 排除第一项情形
+                # 1:C>0, use param_d
+                if self.disfrequencies[n].get(gram, 0) > 0:
+                    param_d = self.d(gram)
+                    # print('param_d = ', param_d)
+                    Ck = self.frequencies[n][gram]
+                    Ck_1 = self.frequencies[n - 1][gram[:-1]]
+                    P = param_d * Ck / Ck_1
+                    self.disfrequencies[n][gram] = P
+
+                # 2:C=0, use param_a
+                else:
+                    param_a = self.alpha(gram[:-1])
+                    # print('param_a = ', param_a)
+                    P = self.disfrequencies[n-1].get(gram[1:], self.eps) * param_a
+                    self.disfrequencies[n][gram] = P
+
+            # 第一项
             else:
                 self.disfrequencies[n][gram] = self.frequencies[n].get(gram, self.eps) / float(len(self.frequencies[0]))
         return self.disfrequencies[n][gram]
 
+    # 交叉熵
     def log_prob(self, sentence: IntSentence) -> float:
         """
         Calculates the log probability of the given sentence. Assumes that the
@@ -301,10 +338,18 @@ class NGramModel:
         """
 
         log_prob = 0.
+        cnt = 0
+        n = self.n
         for i in range(2, len(sentence) + 1):
             # TODO: calculates the log probability
-            pass
+            cnt = float(cnt+1)
+            length = min(n, i)
+            gram = tuple(sentence[i-length+1:i])  # 可能超出范围,有待测试
+            log_prob = log_prob + math.log2(self.__getitem__(gram))
+
+        log_prob = - log_prob / cnt
         return log_prob
+
 
     def ppl(self, sentence: IntSentence) -> float:
         """
@@ -321,21 +366,25 @@ class NGramModel:
         # TODO: calculates the PPL
         pass
 
-if __name__ == "__main__":
-    action = "train"
 
-    if action=="train":
-        with open("data/news.2007.en.shuffled.deduped.train") as f:
+if __name__ == "__main__":
+    action = "eval"
+
+    if action == "train":
+    #     with open("data/news.2007.en.shuffled.deduped.train") as f:
+    #         texts = list(map(lambda l: l.strip(), f.readlines()))
+
+        with open("data/train_part.txt", encoding='UTF-8') as f:
             texts = list(map(lambda l: l.strip(), f.readlines()))
 
         print("Loaded training set.")
 
         corpus = normaltokenize(texts)
         vocabulary = extract_vocabulary(corpus)
-        #print(vocabulary)
+        # print(vocabulary)
         corpus = list(
-                map(functools.partial(words_to_indices, vocabulary),
-                    corpus))
+            map(functools.partial(words_to_indices, vocabulary),
+                corpus))
 
         print("Preprocessed training set.")
 
@@ -347,7 +396,7 @@ if __name__ == "__main__":
 
         print("Dumped model.")
 
-    elif action=="eval":
+    elif action == "eval":
         with open("model.pkl", "rb") as f:
             vocabulary = pkl.load(f)
             model = pkl.load(f)
@@ -357,11 +406,20 @@ if __name__ == "__main__":
             test_set = list(map(lambda l: l.strip(), f.readlines()))
         test_corpus = normaltokenize(test_set)
         test_corpus = list(
-                map(functools.partial(words_to_indices, vocabulary),
-                    test_corpus))
+            map(functools.partial(words_to_indices, vocabulary),
+                test_corpus))
         ppls = []
+        # for t in test_corpus:
+        #     # print(t)
+        #     ppls.append(model.ppl(t))
+        #     print(ppls[-1])
+        # print("Avg: ", sum(ppls) / len(ppls))
+
+
+        probs = []
         for t in test_corpus:
-            #print(t)
-            ppls.append(model.ppl(t))
-            print(ppls[-1])
-        print("Avg: ", sum(ppls)/len(ppls))
+            print(t)
+            # print(t)
+            probs.append(model.log_prob(t))
+            print(probs[-1])
+        print("Avg: ", sum(probs) / len(probs))

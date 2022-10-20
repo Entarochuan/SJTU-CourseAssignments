@@ -64,7 +64,7 @@ if __name__ == "__main__":
     # print(model.vocab_size)
     for key, group in grams:
         cnt = cnt + 1
-        print(key[0])
+        # print(key[0])
         tmp_gram = key[0]
         # print('start')
         # print(tmp_gram)
@@ -75,17 +75,18 @@ if __name__ == "__main__":
         # print('end')
 
 
-        # tmp_gram = list(tmp_gram)
+        tmp_gram = list(tmp_gram)
         # # print(tmp_gram_add)
-        # tmp_gram.append(1)
-        # tmp_gram = tuple(tmp_gram)
+        tmp_gram.append(23)
+        tmp_gram = tuple(tmp_gram)
         index = len(tmp_gram) - 1
-        print(tmp_gram, index)
+        # print(tmp_gram, index)
         if tmp_gram in model.frequencies[index]:
-            print(tmp_gram)
+            # print(tmp_gram)
             print('yes')
-        else:
-            print('No')
+            print(model.frequencies[index][tmp_gram])
+        # else:
+        #     print('No')
         # print(model.frequencies[index][tmp_gram])
 
 
@@ -94,9 +95,9 @@ if __name__ == "__main__":
         if cnt == 1000:
             break
 
-    print(model.vocab_size)
+    # print(model.vocab_size)
 
     # for i in range(model.n):
     #     print(model.frequencies[i])
 
-    # print(model.frequencies[i])
+    # print(model.frequencies[1])
