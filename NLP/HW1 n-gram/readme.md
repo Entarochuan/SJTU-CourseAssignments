@@ -1,10 +1,8 @@
 ## N-Gram homework
 
-
+同步在[Github](https://github.com/Entarochuan/SJTU-CourseAssignments/tree/master/NLP/HW1%20n-gram)。
 
 报告在`ngram.ipynb`内。
-
-
 
 #### Environment
 
