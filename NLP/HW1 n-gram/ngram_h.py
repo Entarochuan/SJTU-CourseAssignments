@@ -388,7 +388,6 @@ class NGramModel:
 
 if __name__ == "__main__":
 
-
     action = "eval"
     eval_type = "prob"
 
