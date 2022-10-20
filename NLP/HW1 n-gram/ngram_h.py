@@ -266,8 +266,8 @@ class NGramModel:
                     gram_add = tuple(gram_add)
 
                     if gram_add in self.frequencies[index]:
-                        print(gram_add)
-                        print(self.frequencies[index].get(gram_add, 0))
+                        # print(gram_add)
+                        # print(self.frequencies[index].get(gram_add, 0))
                         V_plus.append(i)
                         sum_pls = sum_pls + self.disfrequencies[index].get(gram_add, 0)  # checked in test
                         # sum_pls = sum_pls + self.disfrequencies[index].get(gram_add, 0)
@@ -316,7 +316,8 @@ class NGramModel:
                 else:
                     param_a = self.alpha(gram[:-1])
                     # print('param_a = ', param_a)
-                    P = self.disfrequencies[n-1].get(gram[1:], self.eps) * param_a
+                    # P = self.disfrequencies[n-1].get(gram[1:], self.eps) * param_a
+                    P = self.__getitem__(gram[1:]) * param_a
                     self.disfrequencies[n][gram] = P
 
             # 第一项
@@ -342,9 +343,12 @@ class NGramModel:
         n = self.n
         for i in range(2, len(sentence) + 1):
             # TODO: calculates the log probability
+            # 思路是递进地对每一个ngram求概率
             cnt = float(cnt+1)
             length = min(n, i)
-            gram = tuple(sentence[i-length+1:i])  # 可能超出范围,有待测试
+            gram = tuple(sentence[i-length:i])  # 可能超出范围,有待测试
+            # print(len(gram))
+            # print(gram)
             log_prob = log_prob + math.log2(self.__getitem__(gram))
 
         log_prob = - log_prob / cnt
@@ -363,19 +367,38 @@ class NGramModel:
             float
         """
 
-        # TODO: calculates the PPL
-        pass
+        # calculates the PPL
+
+        PPL = 1.
+        cnt = 0
+        n = self.n
+        for i in range(2, len(sentence) + 1):
+            # calculates the log probability
+            cnt = cnt + 1
+            length = min(n, i)
+            gram = tuple(sentence[i - length + 1:i])  # 可能超出范围,有待测试
+            PPL = PPL / self.__getitem__(gram)
+
+        # print(PPL)
+        # print(cnt)
+
+        PPL = math.pow(PPL, 1/cnt)
+        return PPL
 
 
 if __name__ == "__main__":
+
+
     action = "eval"
+    eval_type = "prob"
 
     if action == "train":
-    #     with open("data/news.2007.en.shuffled.deduped.train") as f:
-    #         texts = list(map(lambda l: l.strip(), f.readlines()))
-
-        with open("data/train_part.txt", encoding='UTF-8') as f:
+        with open("data/news.2007.en.shuffled.deduped.train", encoding='UTF-8') as f:
             texts = list(map(lambda l: l.strip(), f.readlines()))
+
+        # 下面是用部分训练数据测试代码准确性
+        # with open("data/train_part.txt", encoding='UTF-8') as f:
+        #     texts = list(map(lambda l: l.strip(), f.readlines()))
 
         print("Loaded training set.")
 
@@ -408,18 +431,35 @@ if __name__ == "__main__":
         test_corpus = list(
             map(functools.partial(words_to_indices, vocabulary),
                 test_corpus))
-        ppls = []
-        # for t in test_corpus:
-        #     # print(t)
-        #     ppls.append(model.ppl(t))
-        #     print(ppls[-1])
-        # print("Avg: ", sum(ppls) / len(ppls))
 
+        # 输出两种评估方式的结果
+        if eval_type == "ppl":
+            Left = len(test_corpus)
+            Sum = 0
+            ppls = []
+            for t in test_corpus:
+                # print(t)
+                # 计数
+                Sum = Sum + 1
+                Left = Left - 1
+                print(Left, " Sentences left")
+                print(Sum, " Sentences done")
 
-        probs = []
-        for t in test_corpus:
-            print(t)
-            # print(t)
-            probs.append(model.log_prob(t))
-            print(probs[-1])
-        print("Avg: ", sum(probs) / len(probs))
+                ppls.append(model.ppl(t))
+                print(ppls[-1])
+            print("Avg of ppls: ", sum(ppls) / len(ppls))
+
+        if eval_type == "prob":
+
+            Left = len(test_corpus)
+            Sum = 0
+            probs = []
+            for t in test_corpus:
+                Sum = Sum + 1
+                Left = Left - 1
+                print(Left, " Sentences left")
+                print(Sum, " Sentences done")
+                # print(t)
+                probs.append(model.log_prob(t))
+                print(probs[-1])
+            print("Avg of probs: ", sum(probs) / len(probs))
