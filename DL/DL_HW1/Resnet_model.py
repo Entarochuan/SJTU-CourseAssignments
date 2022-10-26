@@ -1,6 +1,7 @@
 #coding=utf8
 """
     filename: Resnet_model.py
+    Author: Ma  Yichuan
     data: 10/13
     description: 基于jittor框架实现并训练Resnet
     Reference: Dive Into Deep Learning, jittor document
@@ -62,10 +63,10 @@ class Resnet(nn.Module):
                                  nn.MaxPool2d(kernel_size=3, stride=2, padding=1))
         self.b_2 = nn.Sequential(*Resnet_Block(64, 64, 2, first_block=True))
         self.b_3 = nn.Sequential(*Resnet_Block(64, 128, 2))
-        self.b_4 = nn.Sequential(*Resnet_Block(128, 128, 2))
-        self.b_5 = nn.Sequential(*Resnet_Block(128, 128, 2))
+        self.b_4 = nn.Sequential(*Resnet_Block(128, 256, 2))
+        self.b_5 = nn.Sequential(*Resnet_Block(256, 512, 2))
         self.Avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Linear(128, 10)
+        self.fc = nn.Linear(512, 10)
 
     def Show_net(self):
         X = jt.rand((1, 1, 224, 224))
