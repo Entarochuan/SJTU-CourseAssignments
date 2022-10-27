@@ -3,13 +3,8 @@
 
     filename: HW1_1.py
     data: 10/13
-    description: 基于jittor框架实现并训练Resnet
-    Reference: jittor官方文档
-
-    目标:
-    1. 下载并学习使用CIFAR-10数据集
-    2. 搭建深度学习训练框架 Jittor，Mindspore 或 Paddle （三选一，推荐Jittor），并设计深度学习模型
-    3. 在给定的要求下改进模型
+    description: jittor Resnet
+    Reference: jittor
 
 """
 
@@ -24,6 +19,8 @@ import os, sys, logging
 from jittor import nn
 import numpy as np
 import jittor.transform as trans
+import random
+random.seed(999)
 
 
 def train(model, train_loader, optimizer, epochs, writer=None):
@@ -49,17 +46,26 @@ def train_edit(model, train_loader, optimizer, epochs, writer=None):
         for batch_idx, (inputs, targets) in enumerate(train_loader):
 
             # New dataset
-            if batch_idx % 10 != 0:
+            i = random.randint(1, 10)
+            if i % 10 != 0:
+                flag = False
                 mask = (targets >= 5)
             else:
+                flag = True
                 mask = (targets >= 0)
 
             targets = targets[mask]
             inputs = inputs[mask]
 
             outputs = model(inputs)
-            loss = nn.cross_entropy_loss(outputs, targets)
+            # loss re-weighted
+            if flag:
+                loss = nn.cross_entropy_loss(outputs, targets)
+            else:
+                loss = nn.cross_entropy_loss(outputs, targets) * 0.01
+
             optimizer.step(loss)
+
             if batch_idx % 100 == 0:
                 print('Epoch: {} batch:[{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                         epoch+1, batch_idx, int(len(train_loader)/64),
@@ -91,6 +97,7 @@ def test(model, val_loader):
 
 if __name__ == "__main__":
 
+    jt.flags.use_cuda = 1
     batch_size = 64
     learning_rate = 0.01
     momentum = 0.95
@@ -119,14 +126,14 @@ if __name__ == "__main__":
 
     # train(model, train_loader, optimizer, epochs)
     # model.save('./model/Resnet_params.pkl')
-    # train_edit(model, train_loader, optimizer, epochs)
-    # model.save('./model/Resnet_edit_params.pkl')
+    train_edit(model, train_loader, optimizer, epochs)
+    model.save('./model/Resnet_edit_params.pkl')
 
-    if os.path.exists('./model/Resnet_params.pkl'):
-        print('Origin data:')
-        model.load('./model/Resnet_params.pkl')
-        test(model, val_loader)
-
+    # if os.path.exists('./model/Resnet_params.pkl'):
+    #     print('Origin data:')
+    #     model.load('./model/Resnet_params.pkl')
+    #     test(model, val_loader)
+    #
     if os.path.exists('./model/Resnet_edit_params.pkl'):
         print('Edited data:')
         model.load('./model/Resnet_edit_params.pkl')
