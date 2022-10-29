@@ -20,6 +20,7 @@ from jittor import nn
 import numpy as np
 import jittor.transform as trans
 import random
+from imblearn.over_sampling import RandomOverSampler, SMOTE
 random.seed(999)
 
 
@@ -39,6 +40,61 @@ def train(model, train_loader, optimizer, epochs, writer=None):
 
 
 def train_edit(model, train_loader, optimizer, epochs, writer=None):
+
+    model.train()
+
+    for epoch in range(epochs):
+        for batch_idx, (inputs, targets) in enumerate(train_loader):
+            # New dataset
+            i = random.randint(1, 10)
+            if i % 10 != 0:
+                flag = False
+                mask = (targets >= 5)
+            else:
+                flag = True
+                mask = (targets >= 0)
+
+            targets = targets[mask]
+            inputs = inputs[mask]
+
+            # loss re-weighted + major undersample + minor oversample
+            if flag:
+                outputs = model(inputs)
+                weight = jt.array([1., 1., 1., 1., 1., 1., 1., 1., 1., 1.])  # edit weight
+                loss = nn.cross_entropy_loss(outputs, targets, weight)
+            else:
+                # # reshape
+                # nsamples, nx, ny, nz = inputs.shape
+                # reshaped_inputs = inputs.reshape((nsamples, nx * ny * nz))
+                # # oversampling
+                # ros_over = RandomOverSampler(random_state=0)
+                # reshaped_inputs, targets = ros_over.fit_resample(reshaped_inputs, targets)
+                # # ros_smote = SMOTE()
+                # # reshaped_inputs, targets = SMOTE().fit(reshaped_inputs, targets)
+                #
+                # # reshaped again
+                # nsamples, nsum = reshaped_inputs.shape
+                # inputs = reshaped_inputs.reshape((nsamples, nx, ny, nz))
+                #
+                # inputs = jt.array(inputs)
+                # targets = jt.array(targets)
+                #
+                outputs = model(inputs)
+                # pred = np.argmax(outputs.data, axis=1)
+
+                # loss re-weighted
+                weight = jt.array([0., 0., 0., 0., 0., 1., 1., 1., 1., 1.]) * 0.01
+                loss = nn.cross_entropy_loss(outputs, targets, weight)
+
+            optimizer.step(loss)
+
+            if batch_idx % 100 == 0:
+                print('Epoch: {} batch:[{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+                        epoch+1, batch_idx, int(len(train_loader)/64),
+                        100. * batch_idx / (len(train_loader)/64.), loss.data[0]))
+
+
+def train_edit_A(model, train_loader, optimizer, epochs, writer=None):
 
     model.train()
 
@@ -99,7 +155,7 @@ if __name__ == "__main__":
 
     jt.flags.use_cuda = 1
     batch_size = 64
-    learning_rate = 0.01
+    learning_rate = 0.05
     momentum = 0.95
     weight_decay = 1e-4
     epochs = 20
