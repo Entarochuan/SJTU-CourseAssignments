@@ -1,13 +1,12 @@
-#coding=utf8
+# coding=utf8
 """
 
     filename: HW1_1.py
     data: 10/13
     description: jittor Resnet
-    Reference: jittor
+    Reference: jittor document
 
 """
-
 
 import jittor as jt
 from jittor import nn
@@ -20,12 +19,14 @@ from jittor import nn
 import numpy as np
 import jittor.transform as trans
 import random
+
 from imblearn.over_sampling import RandomOverSampler, SMOTE
+from imblearn.under_sampling import ClusterCentroids, RandomUnderSampler
+
 random.seed(999)
 
 
 def train(model, train_loader, optimizer, epochs, writer=None):
-
     model.train()
 
     for epoch in range(epochs):
@@ -35,18 +36,20 @@ def train(model, train_loader, optimizer, epochs, writer=None):
             optimizer.step(loss)
             if batch_idx % 100 == 0:
                 print('Epoch: {} batch:[{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                        epoch+1, batch_idx, int(len(train_loader)/64),
-                        100. * batch_idx / (len(train_loader)/64.), loss.data[0]))
+                    epoch + 1, batch_idx, int(len(train_loader) / 64),
+                    100. * batch_idx / (len(train_loader) / 64.), loss.data[0]))
 
 
-def train_edit(model, train_loader, optimizer, epochs, writer=None):
-
+def train_edit_B(model, train_loader, optimizer, epochs, writer=None):
     model.train()
 
     for epoch in range(epochs):
+        Flag_of_label = False
         for batch_idx, (inputs, targets) in enumerate(train_loader):
-            # New dataset
+
+            #
             i = random.randint(1, 10)
+
             if i % 10 != 0:
                 flag = False
                 mask = (targets >= 5)
@@ -57,45 +60,58 @@ def train_edit(model, train_loader, optimizer, epochs, writer=None):
             targets = targets[mask]
             inputs = inputs[mask]
 
-            # loss re-weighted + major undersample + minor oversample
-            if flag:
-                outputs = model(inputs)
-                weight = jt.array([1., 1., 1., 1., 1., 1., 1., 1., 1., 1.])  # edit weight
-                loss = nn.cross_entropy_loss(outputs, targets, weight)
+            if not Flag_of_label:
+                labels = targets
+                images = inputs
+                Flag_of_Label = True
             else:
-                # # reshape
-                # nsamples, nx, ny, nz = inputs.shape
-                # reshaped_inputs = inputs.reshape((nsamples, nx * ny * nz))
-                # # oversampling
-                # ros_over = RandomOverSampler(random_state=0)
-                # reshaped_inputs, targets = ros_over.fit_resample(reshaped_inputs, targets)
-                # # ros_smote = SMOTE()
-                # # reshaped_inputs, targets = SMOTE().fit(reshaped_inputs, targets)
-                #
-                # # reshaped again
-                # nsamples, nsum = reshaped_inputs.shape
-                # inputs = reshaped_inputs.reshape((nsamples, nx, ny, nz))
-                #
-                # inputs = jt.array(inputs)
-                # targets = jt.array(targets)
-                #
-                outputs = model(inputs)
-                # pred = np.argmax(outputs.data, axis=1)
+                labels = jt.concat((labels, targets))
+                images = jt.concat((inputs, images))
 
+            if not flag:
+                # 不充分data训练
+                outputs = model(inputs)
+                weight = jt.array([0.1, 0.1, 0.1, 0.1, 0.1, 1., 1., 1., 1., 1.])
+                loss = nn.cross_entropy_loss(outputs, targets, weight) * 0.001
+
+                optimizer.step(loss)
+
+                if batch_idx % 10 == 0:
+                    print('Epoch: {} batch:[{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+                        epoch + 1, batch_idx, int(len(train_loader) / 64),
+                        100. * batch_idx / (len(train_loader) / 64.), loss.data[0]))
+
+            else:
+                # Resample
+                nsamples, nx, ny, nz = images.shape
+                reshaped_images = images.reshape((nsamples, nx * ny * nz))
+                # undersampling
+                Resample_type = RandomOverSampler(random_state=0)
+                reshaped_images, labels = Resample_type.fit_resample(reshaped_images, labels)
+
+                # reshaped again
+                nsamples, nsum = reshaped_images.shape
+                images = reshaped_images.reshape((nsamples, nx, ny, nz))
+
+                images = jt.array(images)
+                labels = jt.array(labels)
+                # print(images.shape)
+                # print(labels.shape)
+
+                outputs = model(inputs)
                 # loss re-weighted
-                weight = jt.array([0., 0., 0., 0., 0., 1., 1., 1., 1., 1.]) * 0.01
+                weight = jt.array([1, 1, 1, 1, 1., 1., 1., 1., 1., 1.])
                 loss = nn.cross_entropy_loss(outputs, targets, weight)
 
-            optimizer.step(loss)
+                optimizer.step(loss)
 
-            if batch_idx % 100 == 0:
-                print('Epoch: {} batch:[{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                        epoch+1, batch_idx, int(len(train_loader)/64),
-                        100. * batch_idx / (len(train_loader)/64.), loss.data[0]))
+                if batch_idx % 10 == 0:
+                    print('Epoch: {} batch:[{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+                        epoch + 1, batch_idx, int(len(train_loader) / 64),
+                        100. * batch_idx / (len(train_loader) / 64.), loss.data[0]))
 
 
 def train_edit_A(model, train_loader, optimizer, epochs, writer=None):
-
     model.train()
 
     for epoch in range(epochs):
@@ -118,18 +134,17 @@ def train_edit_A(model, train_loader, optimizer, epochs, writer=None):
             if flag:
                 loss = nn.cross_entropy_loss(outputs, targets)
             else:
-                loss = nn.cross_entropy_loss(outputs, targets) * 0.01
+                loss = nn.cross_entropy_loss(outputs, targets) * 0.001
 
             optimizer.step(loss)
 
-            if batch_idx % 100 == 0:
+            if batch_idx % 10 == 0:
                 print('Epoch: {} batch:[{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                        epoch+1, batch_idx, int(len(train_loader)/64),
-                        100. * batch_idx / (len(train_loader)/64.), loss.data[0]))
+                    epoch + 1, batch_idx, int(len(train_loader) / 64),
+                    100. * batch_idx / (len(train_loader) / 64.), loss.data[0]))
 
 
 def test(model, val_loader):
-
     model.eval()
     test_loss = 0
     correct = 0
@@ -142,7 +157,7 @@ def test(model, val_loader):
         batch_size = inputs.shape[0]
         outputs = model(inputs)
         pred = np.argmax(outputs.data, axis=1)
-        acc = np.sum(targets.data==pred)
+        acc = np.sum(targets.data == pred)
         total_acc += acc
         total_num += batch_size
         total_loss += nn.cross_entropy_loss(outputs, targets).data[0]
@@ -156,7 +171,7 @@ if __name__ == "__main__":
     jt.flags.use_cuda = 1
     batch_size = 64
     learning_rate = 0.05
-    momentum = 0.95
+    momentum = 0.9
     weight_decay = 1e-4
     epochs = 20
 
@@ -170,8 +185,11 @@ if __name__ == "__main__":
         trans.ImageNormalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
     ])
 
-    train_loader = jt.dataset.CIFAR10(root='./data/cifar/', train=True, transform=train_transform, target_transform=None, download=True).set_attrs(batch_size=batch_size, shuffle=True)
-    val_loader = jt.dataset.CIFAR10(root='./data/cifar/', train=False, transform=test_transform, target_transform=None, download=True).set_attrs(batch_size=batch_size, shuffle=True)
+    train_loader = jt.dataset.CIFAR10(root='./data/cifar/', train=True, transform=train_transform,
+                                      target_transform=None, download=True).set_attrs(batch_size=batch_size,
+                                                                                      shuffle=True)
+    val_loader = jt.dataset.CIFAR10(root='./data/cifar/', train=False, transform=test_transform, target_transform=None,
+                                    download=True).set_attrs(batch_size=batch_size, shuffle=True)
 
     model = Resnet_model.Resnet()
     optimizer = nn.SGD(model.parameters(), learning_rate, momentum=0.9, weight_decay=1e-4)
@@ -180,17 +198,17 @@ if __name__ == "__main__":
     #     train(model, train_loader, optimizer, epochs)
     #     model.save('./model/Resnet_params.pkl')
 
-    # train(model, train_loader, optimizer, epochs)
-    # model.save('./model/Resnet_params.pkl')
-    train_edit(model, train_loader, optimizer, epochs)
-    model.save('./model/Resnet_edit_params.pkl')
+    train(model, train_loader, optimizer, epochs)
+    model.save('./model/Resnet_params.pkl')
+    # train_edit(model, train_loader, optimizer, epochs)
+    # model.save('./model/Resnet_edit_params.pkl')
 
-    # if os.path.exists('./model/Resnet_params.pkl'):
-    #     print('Origin data:')
-    #     model.load('./model/Resnet_params.pkl')
-    #     test(model, val_loader)
-    #
-    if os.path.exists('./model/Resnet_edit_params.pkl'):
-        print('Edited data:')
-        model.load('./model/Resnet_edit_params.pkl')
+    if os.path.exists('./model/Resnet_params.pkl'):
+        print('Origin data:')
+        model.load('./model/Resnet_params.pkl')
         test(model, val_loader)
+
+    # if os.path.exists('./model/Resnet_edit_params.pkl'):
+    #     print('Edited data:')
+    #     model.load('./model/Resnet_edit_params.pkl')
+    #     test(model, val_loader)
