@@ -67,7 +67,6 @@ class Resnet(nn.Module):
         self.b_5 = nn.Sequential(*Resnet_Block(256, 512, 2))
         self.Avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(512, 10)
-        self.Softmax = nn.Softmax()
 
     def Show_net(self):
         X = jt.rand((1, 1, 224, 224))
@@ -84,7 +83,6 @@ class Resnet(nn.Module):
         x = self.Avgpool(x)
         x = jt.reshape(x, (x.shape[0], -1))
         x = self.fc(x)
-        x = self.Softmax(x)
         return x
 
 
