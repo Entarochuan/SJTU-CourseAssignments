@@ -80,6 +80,7 @@ def train(model, train_loader, test_loader, loss, epochs, optimizer):
 
 
 def Train_Pretrained_Model(train_dataset, test_dataset):
+    
     """
         把Resnet部分作为预训练模型导入。
     """
@@ -93,7 +94,7 @@ def Train_Pretrained_Model(train_dataset, test_dataset):
     model = paddle.Model(model) 
     optim = paddle.optimizer.Adam(learning_rate=0.001, parameters=model.parameters())
     model.prepare(optim, paddle.nn.CrossEntropyLoss(), Accuracy())
-    model.fit(train_dataset, epochs=2, batch_size=64, verbose=1)
+    model.fit(train_dataset, epochs=10, batch_size=64, verbose=1)
     model.evaluate(test_dataset, batch_size=64, verbose=1)
 
     
@@ -103,10 +104,10 @@ if __name__ == "__main__":
     train_loader, test_loader , train_dataset, test_dataset = Load_Data()
     
     batch_size = 64
-    learning_rate = 0.05
-    momentum = 0.91
+    learning_rate = 0.01
+    momentum = 0.9
     weight_decay = 1e-4
-    epochs = 10  
+    epochs = 30 
     
     model = Model.PremNet(pic_num=4, cnn_hidden_size=512, batch_size=batch_size)
     loss = nn.CrossEntropyLoss(use_softmax=False)
@@ -118,7 +119,7 @@ if __name__ == "__main__":
     
         train : 训练模型
         
-        Train_Pretrained_Model : 将预训练参数加载到Resenet模型中。
+        Train_Pretrained_Model : 将预训练参数加载到Resenet模型中训练。
         
     """
     

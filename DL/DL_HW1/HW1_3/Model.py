@@ -148,9 +148,10 @@ class PremNet(paddle.nn.Layer):
     def __init__(self, pic_num, cnn_hidden_size=512, batch_size=64):
         super(PremNet, self).__init__()
         self.pic_num = pic_num
-        self.cnn_hidden_Size = cnn_hidden_size * 4 
+        self.cnn_hidden_Size = cnn_hidden_size * 8  # 引入注意力机制 
         self.batch_size = batch_size
         self.Blk_1 = Resnet_Block_img(512)
+        self.Attention = paddle.incubate.nn.FusedMultiHeadAttention(512, 2)  # Multi-head Attention
         self.feature_size = pic_num * pic_num
         self.FC7 = Multilayer_FC7(self.cnn_hidden_Size, self.feature_size)
         self.FC4 = Multilayer_FC4(4096, 16)
@@ -164,10 +165,22 @@ class PremNet(paddle.nn.Layer):
         """
 
         features = []
+        query = paddle.to_tensor(np.empty((4, 64, 512)), dtype='float32')
+        
+        i=0
         for xi in x:
-            feature_i = self.Blk_1(xi)
+            feature_i = self.Blk_1(xi)          
+            query[i] = feature_i
             features.append(feature_i)
-
+            i = i + 1
+            
+        # for i in range(4):
+        query = paddle.transpose(query, perm=[1, 0, 2])   
+        Attend = self.Attention(query, query, query)  # Self Attention
+        Attend = paddle.transpose(Attend, perm=[1, 0, 2])
+        for i in range(4):
+            features.append(Attend[i])
+            
         feature = paddle.concat(x=features, axis=1)
         # print(feature.shape)
         feature = self.FC7(feature)
@@ -274,6 +287,7 @@ def Evaluate(model, test_loader, best_acc):
     return best_acc
 
 
+# 加载预训练参数，训练Resnet分类网络。
 class Resnet_Classification(nn.Layer):
 
     def __init__(self, hidden_size=512):
