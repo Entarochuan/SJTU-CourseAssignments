@@ -124,6 +124,7 @@ if __name__ == "__main__":
     """
     
     train(model, train_loader,test_loader, loss, epochs, optimizer)
+    
     Train_Pretrained_Model(train_dataset, test_dataset)
     
         
