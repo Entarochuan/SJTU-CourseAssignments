@@ -14,6 +14,8 @@
 
    - `Train.py`:训练Resnet模型,同时实现了训练集切分后训练函数的修改。
 
+   - `result_HW1-1&Hw1_2`: HW1-1, HW1-2两部分的结果图。
+
         
 
    - `HW1_3`:基于`paddle`框架实现的拼图模型、预训练Resnet参数保存和Resnet训练。
@@ -28,9 +30,11 @@
 
 #### 2.1 回归问题
 
-基于jittor框架实现了一个基础的多层感知机，拟合y = x^2函数,拟合结果如图:
+基于`jittor`框架实现了一个基础的多层感知机，拟合y = x^2函数,拟合结果如图:
 
-![HW1_1_result](D:\SJTU-Course-Assignments\SJTU-CourseAssignments\DL\DL_HW1\HW1_1_result.png)
+![HW1_1_result](D:\SJTU-Course-Assignments\SJTU-CourseAssignments\DL\DL_HW1\result_HW1-1&Hw1_2\HW1_1_result.png)
+
+
 
 #### 2.2 分类问题
 
@@ -72,7 +76,7 @@ else:
 
 
 
-然而，上述的方案虽然能够训练模型，但并没有充分利用数据。第二种方案实现如下:
+然而，上述的方案虽然能够训练模型，但并没有充分利用数据，有投机取巧之嫌。第二种方案实现如下:
 
 step1: 当前batch的数据被切分时，首先用被切分的数据乘以0.001的权重，进行模型预热。这一部分的实现如下:
 
@@ -91,7 +95,7 @@ if not flag:
             100. * batch_idx / (len(train_loader) / 64.), loss.data[0] * 1000 ))
 ```
 
-step2: 在batch迭代过程中，记录数据直至出现第一个未被切分的样本，将记录的数据整合进行过采样，得到均匀的数据样本，再通过模型正常下降，这一部分的实现如下:
+step2: 在batch迭代过程中，记录数据直至出现第一个未被切分的样本，将记录的数据整合进行过采样，(使用的软件包为`imblearn`)得到均匀的数据样本，再通过模型正常下降，这一部分的实现如下:
 
 ```python
 else:
@@ -127,3 +131,8 @@ else:
 
 按照同样的参数训练，在测试集上的表现: Test acc = 66.19%
 
+
+
+#### 2.3 拼图模型
+
+##### 2.3.1 模型结构
