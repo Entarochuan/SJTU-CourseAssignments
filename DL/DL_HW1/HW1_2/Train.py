@@ -180,7 +180,7 @@ if __name__ == "__main__":
     learning_rate = 0.005
     momentum = 0.91
     weight_decay = 1e-4
-    epochs = 20
+    epochs = 30
 
     train_transform = trans.Compose([
         trans.Resize(32),
@@ -204,18 +204,29 @@ if __name__ == "__main__":
     # if not os.path.exists('./model/Resnet_params.pkl'):
     #     train(model, train_loader, optimizer, epochs)
     #     model.save('./model/Resnet_params.pkl')
+        
+    # if not os.path.exists('./model/Resnet_edit_A_params.pkl'):
+    #     train_edit_A(model, train_loader, optimizer, epochs)
+    #     model.save('./model/Resnet_edit_A_params.pkl')
+    
+    # if not os.path.exists('./model/Resnet_edit_B_params.pkl'):
+    #     train_edit_B(model, train_loader, optimizer, epochs)
+    #     model.save('./model/Resnet_edit_B_params.pkl')
+    
 
-    train(model, train_loader, optimizer, epochs)
-    model.save('./model/Resnet_params.pkl')
-    # train_edit_B(model, train_loader, optimizer, epochs)
-    # model.save('./model/Resnet_edit_params.pkl')
 
     # if os.path.exists('./model/Resnet_params.pkl'):
-    #     print('Origin data:')
+    #     print('Training with the original data:')
     #     model.load('./model/Resnet_params.pkl')
     #     test(model, val_loader)
 
-    if os.path.exists('./model/Resnet_edit_params.pkl'):
-        print('Edited data:')
-        model.load('./model/Resnet_edit_params.pkl')
+    # if os.path.exists('./model/Resnet_edit_A_params.pkl'):
+    #     print('Edited data, train_method_1:')
+    #     model.load('./model/Resnet_edit_A_params.pkl')
+    #     test(model, val_loader)
+    
+    if os.path.exists('./model/Resnet_edit_B_params.pkl'):
+        print('Edited data, train_method_2:')
+        model.load('./model/Resnet_edit_B_params.pkl')
         test(model, val_loader)
+

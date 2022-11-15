@@ -100,7 +100,7 @@ transfrom = transforms.ToTensor()
 train_set = CIFAR10DVS(root_dir, data_type='frame', frames_number=8, split_by='number')
 test_set = CIFAR10DVS(root_dir, data_type='frame', frames_number=8, split_by='number')
 
-device = 1
+device = 2
 batch_size = 32
 learning_rate = 5e-2
 T = int(8)
