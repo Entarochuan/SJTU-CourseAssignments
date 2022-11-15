@@ -32,7 +32,7 @@
 
 基于`jittor`框架实现了一个基础的多层感知机，拟合y = x^2函数,拟合结果如图:
 
-![HW1_1_result](D:\SJTU-Course-Assignments\SJTU-CourseAssignments\DL\DL_HW1\result_HW1-1&Hw1_2\HW1_1_result.png)
+[![HW1-1-result.png](https://i.postimg.cc/X7xKnSSr/HW1-1-result.png)](https://postimg.cc/kB6RyH5C)
 
 
 
@@ -136,3 +136,5 @@ else:
 #### 2.3 拼图模型
 
 ##### 2.3.1 模型结构
+
+使用Resnet处理
