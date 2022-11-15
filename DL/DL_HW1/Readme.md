@@ -137,4 +137,32 @@ else:
 
 ##### 2.3.1 模型结构
 
-使用Resnet处理
+使用`Resnet`处理输入图片提取特征并拼接，经过`FC7`， `FC4`两个全连接网络输出16维向量，reshape为4*4维度矩阵，使用`pygmtools`的`Sinkhorn`工具
+
+变换为双随机矩阵作为预测值。
+
+
+
+##### 2.3.2 预测表现
+
+Test Acc = 52.31%
+
+
+
+##### 2.3.3 使用预训练参数
+
+Resnet的训练使用了`paddle`提供的训练函数:
+
+```python
+model = paddle.Model(model) 
+optim = paddle.optimizer.Adam(learning_rate=0.001, parameters=model.parameters())
+model.prepare(optim, paddle.nn.CrossEntropyLoss(), Accuracy())
+model.fit(train_dataset, epochs=30, batch_size=64, verbose=1)
+```
+
+同样的参数下:
+
+使用前, Resnet表现为: Test Acc = 82.13 % 
+
+使用后, Resnet表现为: Test Acc = 82.78 % 
+
