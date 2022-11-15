@@ -79,35 +79,44 @@ def train(model, train_loader, test_loader, loss, epochs, optimizer):
     paddle.save(model.Blk_1.state_dict(), './Pretrained_Resnet/pretrain.pdparams')
 
 
-def Train_Pretrained_Model(train_dataset, test_dataset):
+def Train_Pretrained_Model(train_dataset, test_dataset, use_pretrained=True):
     
     """
         把Resnet部分作为预训练模型导入。
     """
     
-    layer_state_dict = paddle.load('./Pretrained_Resnet/pretrain.pdparams')
-    # Pretrained_Model = Model.Resnet_Block_img(512)
-    
     model = Model.Resnet_Classification(512)
-    model.set_state_dict(layer_state_dict)
     
-    model = paddle.Model(model) 
-    optim = paddle.optimizer.Adam(learning_rate=0.001, parameters=model.parameters())
-    model.prepare(optim, paddle.nn.CrossEntropyLoss(), Accuracy())
-    model.fit(train_dataset, epochs=10, batch_size=64, verbose=1)
-    model.evaluate(test_dataset, batch_size=64, verbose=1)
+    if use_pretrained:
+        layer_state_dict = paddle.load('./Pretrained_Resnet/pretrain.pdparams')
+        # Pretrained_Model = Model.Resnet_Block_img(512)
+        
+        model.set_state_dict(layer_state_dict)
+        
+        model = paddle.Model(model) 
+        optim = paddle.optimizer.Adam(learning_rate=0.001, parameters=model.parameters())
+        model.prepare(optim, paddle.nn.CrossEntropyLoss(), Accuracy())
+        model.fit(train_dataset, epochs=30, batch_size=64, verbose=1)
+        model.evaluate(test_dataset, batch_size=64, verbose=1)
+    
+    else:
+        model = paddle.Model(model) 
+        optim = paddle.optimizer.Adam(learning_rate=0.001, parameters=model.parameters())
+        model.prepare(optim, paddle.nn.CrossEntropyLoss(), Accuracy())
+        model.fit(train_dataset, epochs=30, batch_size=64, verbose=1)
+        model.evaluate(test_dataset, batch_size=64, verbose=1)
 
     
 if __name__ == "__main__":
     
-    paddle.device.set_device("gpu:1")
+    paddle.device.set_device("gpu:0")
     train_loader, test_loader , train_dataset, test_dataset = Load_Data()
     
     batch_size = 64
     learning_rate = 0.01
     momentum = 0.9
     weight_decay = 1e-4
-    epochs = 30 
+    epochs = 50
     
     model = Model.PremNet(pic_num=4, cnn_hidden_size=512, batch_size=batch_size)
     loss = nn.CrossEntropyLoss(use_softmax=False)
@@ -123,9 +132,9 @@ if __name__ == "__main__":
         
     """
     
-    train(model, train_loader,test_loader, loss, epochs, optimizer)
+    # train(model, train_loader,test_loader, loss, epochs, optimizer)
     
-    Train_Pretrained_Model(train_dataset, test_dataset)
+    Train_Pretrained_Model(train_dataset, test_dataset, False)
     
         
     
