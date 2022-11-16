@@ -3,78 +3,93 @@
     Author : Ma Yichuan
     Description : 实现图片切分模型
     Referrence : paddle document 
-    
+    conda env: DL on server
 """
 
-from bdb import Breakpoint
+# Requiring Paddle Tools
 import paddle 
 import paddle.nn.functional as F
 import paddle.nn as nn
-from paddle.metric import Accuracy
 import paddle.vision.transforms as transforms
-import itertools
-import os, sys, logging
-from paddle.vision.datasets import Cifar10
+from paddle.metric import Accuracy
+
+import random
+import sys
+
+# Functions implemented 
 import Model
 import numpy as np
+from dataset import * 
+import Args
 
 # paddle.utils.run_check()
 
-def Load_Data():
+def Load_Data(batch_size):
     
+    """ Load Cifar10 dataset
+
+    Args:
+        batch_size (int): Batch_szie
+
+    Returns:
+        dataloader, dataset 
+    """
     normalize = transforms.Normalize(
         mean=[123.675, 116.28, 103.53], std=[58.395, 57.120, 57.375], data_format='CHW')
 
-    transform = transforms.Compose([
+    transform_train = transforms.Compose([
+        transforms.RandomResizedCrop(32),
+        transforms.RandomHorizontalFlip(), transforms.Transpose(),
+        normalize,
+    ])
+    
+    transform_test = transforms.Compose([
         transforms.RandomResizedCrop(32),
         transforms.RandomHorizontalFlip(), transforms.Transpose(),
         normalize,
     ])
 
-    train_dataset = paddle.vision.datasets.Cifar10(mode='train', transform=transform)
-    test_dataset = paddle.vision.datasets.Cifar10(mode='test', transform=transform)
 
-    batch_size = 64 
-    train_loader = paddle.io.DataLoader(train_dataset, return_list=True, shuffle=True, 
-                                        batch_size=batch_size, drop_last=True)
-    test_loader = paddle.io.DataLoader(test_dataset, return_list=True, shuffle=True, 
-                                    batch_size=batch_size, drop_last=True)
+    train_dataset = paddle.vision.datasets.Cifar10(mode='train', transform=transform_train)
+    test_dataset = paddle.vision.datasets.Cifar10(mode='test', transform=transform_test)
 
-    return train_loader, test_loader, train_dataset, test_dataset
+    return train_dataset, test_dataset
 
     
-def train(model, train_loader, test_loader, loss, epochs, optimizer):
-    
+def train(model, train_loader, test_loader, loss, epochs, optimizer, visual=False):
+            
     print('start training...')
+    
     model.train()
     best_acc = 0 
+    
     for epoch in range(epochs):
         
         for batch_idx, (img, _) in enumerate(train_loader()) :  
             
-            X_split, label = Model.random_cut(img)
-            output = model(X_split)
+            # print(img.shape) shape = (256, 4, 3, 16, 16)
             
-            label  = paddle.to_tensor(label)
-            output = paddle.to_tensor(output)
+            if img.shape[0] < 256 :
+                break
+            output = model(img)
+            ls = loss(output, _)
             
-            ls = loss(output, label)
-            ls.mean().backward()
+            ls.backward()
             optimizer.step()
             optimizer.clear_grad()
             
-            if batch_idx % 100 == 0:
+            if (batch_idx+1) % 10 == 0:
                 print('Epoch: {} batch:[{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                    epoch + 1, batch_idx, int(len(train_loader)),
+                    epoch+1, batch_idx+1, int(len(train_loader)),
                     100. * batch_idx / float(len(train_loader)), ls.item()))
-
-        # evaluate
+                
+        # evaluate            
         if best_acc == 0:
-            best_acc = Model.Evaluate(model, test_loader, 0)
+            best_acc = Evaluate(model, test_loader, 0)
         else:
-            best_acc = Model.Evaluate(model, test_loader, best_acc)
+            best_acc = Evaluate(model, test_loader, best_acc)
 
-        print('All time best Accuracy: {:.6f}'.format(best_acc))
+        # print('All time best Accuracy: {:.6f}'.format(best_acc))
     
     paddle.save(model.Blk_1.state_dict(), './Pretrained_Resnet/pretrain.pdparams')
 
@@ -109,21 +124,35 @@ def Train_Pretrained_Model(train_dataset, test_dataset, use_pretrained=True):
     
 if __name__ == "__main__":
     
-    paddle.device.set_device("gpu:0")
-    train_loader, test_loader , train_dataset, test_dataset = Load_Data()
     
-    batch_size = 64
-    learning_rate = 0.01
-    momentum = 0.9
-    weight_decay = 1e-4
-    epochs = 50
+    # Initialize Args
+    args = Args.init_args(sys.argv[1:])
+    print(args)
     
-    model = Model.PremNet(pic_num=4, cnn_hidden_size=512, batch_size=batch_size)
-    loss = nn.CrossEntropyLoss(use_softmax=False)
+    max_epoch = args.max_epoch
+    batch_size = args.batch_size
+    seed =  args.seed
+    device = args.device
+    lr = args.lr
+    data_path = args.data_path
+    hidden_size = args.hidden_size
     
-    optimizer = paddle.optimizer.SGD(learning_rate=learning_rate,parameters=model.parameters(), weight_decay=weight_decay)
+    # Pre-Settings
+    random.seed(999)
+    device_use = 'gpu:'+str(device)
+    paddle.device.set_device(device_use)
+    
+    # Load data
+    cifar10_train_new = Cifar_Cut('Train', data_path = data_path)
+    cifar10_test_new = Cifar_Cut('Test', data_path = data_path)
+    train_loader = paddle.io.DataLoader(cifar10_train_new, shuffle=True, batch_size=batch_size)
+    test_loader = paddle.io.DataLoader(cifar10_test_new, shuffle=True, batch_size=batch_size)
 
-
+    # model initialization
+    model = Model.Stitch_Net(pic_num=4, cnn_hidden_size=hidden_size, batch_size=batch_size, use_attention=True)
+    loss = nn.CrossEntropyLoss()
+    optimizer = paddle.optimizer.Adam(learning_rate=lr,parameters=model.parameters())
+    
     """
     
         train : 训练模型
@@ -132,8 +161,9 @@ if __name__ == "__main__":
         
     """
     
-    # train(model, train_loader,test_loader, loss, epochs, optimizer)
+    train(model, train_loader,test_loader, loss, max_epoch, optimizer)
     
+    train_dataset, test_dataset = Load_Data(64)
     Train_Pretrained_Model(train_dataset, test_dataset, False)
     
         

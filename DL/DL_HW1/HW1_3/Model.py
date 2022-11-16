@@ -15,7 +15,7 @@ import numpy as np
 import math
 import paddle.fluid as fluid
 import pygmtools
-
+pygmtools.BACKEND = 'paddle'
 
 class ResidualBlock(nn.Layer):
     def __init__(self, inchannel, outchannel, stride):
@@ -50,7 +50,7 @@ class ResidualBlock(nn.Layer):
 # Resnet_Block get features
 class Resnet_Block_img(paddle.nn.Layer):
 
-    def __init__(self, hidden_size=512):
+    def __init__(self, hidden_size=256):
         super(Resnet_Block_img, self).__init__()
         self.inchannel = 64
         self.conv1 = nn.Sequential(
@@ -94,25 +94,21 @@ class Multilayer_FC7(paddle.nn.Layer):
     def __init__(self, input_size, output_size):
         super(Multilayer_FC7, self).__init__()
         self.linear1 = nn.Linear(in_features=input_size, out_features=512)
-        self.linear_mid = nn.Linear(in_features=512, out_features=512)
-        self.out = nn.Linear(in_features=512, out_features=4096)
+        self.linear_mid = nn.Sequential(nn.Linear(in_features=512, out_features=512),
+                                        nn.ReLU(), 
+                                        nn.Dropout(0.25))
+        self.out = nn.Linear(in_features=512, out_features=output_size)
+        self.dropout = nn.Dropout(0.5)
 
     def forward(self, x):
         x = self.linear1(x)
         x = F.relu(x)
         
         x = self.linear_mid(x)
-        x = F.relu(x)
         x = self.linear_mid(x)
-        x = F.relu(x)
         x = self.linear_mid(x)
-        x = F.relu(x)
         x = self.linear_mid(x)
-        x = F.relu(x)
         x = self.linear_mid(x)
-        x = F.relu(x)
-        x = self.linear_mid(x)
-        x = F.relu(x)
         
         x = self.out(x)
         
@@ -121,18 +117,16 @@ class Multilayer_FC7(paddle.nn.Layer):
 
 class Multilayer_FC4(paddle.nn.Layer):
 
-    def __init__(self, input_size=4096, output_size=16):
+    def __init__(self, input_size=512, output_size=16):
         super(Multilayer_FC4, self).__init__()
-        self.linear1 = nn.Linear(in_features=input_size, out_features=256)
-        self.linear_mid = nn.Linear(in_features=256, out_features=256)
-        self.linear2 = nn.Linear(in_features=256, out_features=1024)
+        self.linear1 = nn.Linear(in_features=input_size, out_features=512)
+        self.linear_mid = nn.Linear(in_features=512, out_features=512)
+        self.linear2 = nn.Linear(in_features=512, out_features=1024)
         self.out = nn.Linear(in_features=1024, out_features=output_size)
         # self.BatchNorm = nn.BatchNorm1D(output_size)
 
     def forward(self, x):
         x = self.linear1(x)
-        x = F.relu(x)
-        x = self.linear_mid(x)
         x = F.relu(x)
         x = self.linear_mid(x)
         x = F.relu(x)
@@ -142,19 +136,26 @@ class Multilayer_FC4(paddle.nn.Layer):
         
         return x
     
+    
+class Stitch_Net(paddle.nn.Layer):
 
-class PremNet(paddle.nn.Layer):
-
-    def __init__(self, pic_num, cnn_hidden_size=512, batch_size=64):
-        super(PremNet, self).__init__()
+    def __init__(self, pic_num, cnn_hidden_size=256, batch_size=64, use_attention=False):
+        super(Stitch_Net, self).__init__()
         self.pic_num = pic_num
-        self.cnn_hidden_Size = cnn_hidden_size * 8  # 引入注意力机制 
+        self.use_attention = use_attention
+        self.cnn_hidden_Size = cnn_hidden_size
+        
+        if use_attention:
+            self.FC7_hidden_size = cnn_hidden_size * 8  # 引入注意力机制 
+        else:
+            self.FC7_hidden_size = cnn_hidden_size * 4
+            
         self.batch_size = batch_size
-        self.Blk_1 = Resnet_Block_img(512)
-        self.Attention = paddle.incubate.nn.FusedMultiHeadAttention(512, 2)  # Multi-head Attention
+        self.Blk_1 = Resnet_Block_img(cnn_hidden_size)
+        self.Attention = paddle.incubate.nn.FusedMultiHeadAttention(256, 2)  # Multi-head Attention
         self.feature_size = pic_num * pic_num
-        self.FC7 = Multilayer_FC7(self.cnn_hidden_Size, self.feature_size)
-        self.FC4 = Multilayer_FC4(4096, 16)
+        self.FC7 = Multilayer_FC7(self.FC7_hidden_size, self.feature_size)
+        # self.FC4 = Multilayer_FC4(4096, 16)
         
     def forward(self, x):
         
@@ -165,126 +166,32 @@ class PremNet(paddle.nn.Layer):
         """
 
         features = []
-        query = paddle.to_tensor(np.empty((4, 64, 512)), dtype='float32')
+        query = paddle.to_tensor(np.empty((self.pic_num, self.batch_size, self.cnn_hidden_Size)), dtype='float32')
         
-        i=0
-        for xi in x:
+        for i in range(self.pic_num):
+            xi = x[:,i,:,:]
+            # print(xi.shape) 
+            xi = paddle.to_tensor(xi, dtype='float32')
             feature_i = self.Blk_1(xi)          
             query[i] = feature_i
             features.append(feature_i)
-            i = i + 1
             
-        # for i in range(4):
+        # print(query.shape): (4, 256, 256)     
         query = paddle.transpose(query, perm=[1, 0, 2])   
         Attend = self.Attention(query, query, query)  # Self Attention
         Attend = paddle.transpose(Attend, perm=[1, 0, 2])
-        for i in range(4):
-            features.append(Attend[i])
+        # print(Attend.shape)
+        if self.use_attention:
+            for i in range(4):
+                features.append(Attend[i])
             
-        feature = paddle.concat(x=features, axis=1)
-        # print(feature.shape)
+        feature = paddle.concat(x=features, axis=1) # print(feature.shape)
         feature = self.FC7(feature)
-        feature = self.FC4(feature)
         length = self.pic_num
-        feature = paddle.reshape(feature, [self.batch_size, length, length])
-        output = pygmtools.linear_solvers.sinkhorn(np.array(feature))
+        feature = paddle.reshape(feature, [256, length, length]) + (1e-4)  # print(feature.shape)：(64, 16)
+        
+        output = pygmtools.linear_solvers.sinkhorn(feature)
         return output
-
-
-def random_cut(img, len=4):
-    
-    """
-        左上:0, 右上:1, 左下:2, 右下:3
-        打乱的顺序表示图片放置的位置.
-        Example : order[0] = 1 表示原来放在左上的图像现在放在了右下
-    """
-    
-    order = np.arange(len)
-    order = np.random.permutation(order)  # 打乱的顺序表示图片放置的位置
-    
-    X_split = paddle.split(img, 2, axis=2)
-    X1_y_split = paddle.split(X_split[0], 2, axis=3)
-    X2_y_split = paddle.split(X_split[1], 2, axis=3)
-    X_split_tmp = X1_y_split + X2_y_split
-    X_split = X_split_tmp
-
-    """ 重排序 """
-    
-    for i in range(len):
-        X_split[order[i]] = X_split_tmp[i]
-    
-    # print('output shape=', output.shape)
-    # print(output)
-    # print(order)
-    
-    """ 标签 """
-
-    label_tmp = np.empty((1, 4, 1))
-
-    # label_tmp[0][0][order[0]] = 1
-    # label_tmp[0][1][order[1]] = 1
-    # label_tmp[0][2][order[2]] = 1
-    # label_tmp[0][3][order[3]] = 1
-    
-    label_tmp[0][0] = [order[0]]
-    label_tmp[0][1] = [order[1]]
-    label_tmp[0][2] = [order[2]]
-    label_tmp[0][3] = [order[3]]
-    
-    label_tmp = paddle.to_tensor(label_tmp, dtype='int64')
-    # print(label_tmp.shape)
-    label = label_tmp
-    for i in range(63):
-        label = paddle.concat((label, label_tmp))
-    
-    # print('label shape=', label.shape)
-    
-    return X_split, label
-
-
-def Evaluate(model, test_loader, best_acc):
-
-    print('evaluating...')
-    model.eval()
-    accuracies = []
-    result = [0, 0]
-    for batch_idx, (img, _) in enumerate(test_loader()):
-        # print(img.shape)
-        X_split, label = random_cut(img)
-        output = model(X_split)
-        
-        for i in range(len(label)): # 每一组切分图片
-            
-            label_i  = label[i]    # 4*1
-            output_i = output[i]   # 4*4
-            
-            for j in range(4):
-                
-                if np.argmax(output_i[j]) != label_i[j]:
-                    flag = False
-                    result[1] = result[1] + 1
-                    break
-                
-            result[0] = result[0] + 1
-            result[1] = result[1] + 1
-        
-        accuracies.append( result[0] / result[1] )
-        
-        # if accuracies[batch_idx] > best_acc :
-        #     best_acc = accuracies[batch_idx]
-        
-        if batch_idx % 30 == 0 and batch_idx >=60 :
-            print('batch:[{}/{} ({:.0f}%)]\tAccuracy: {:.6f}'.format(
-                    batch_idx, int(len(test_loader)),
-                    100. * batch_idx / float(len(test_loader)), accuracies[batch_idx]))
-    
-    if accuracies[len(test_loader)-1] > best_acc : 
-        best_acc = accuracies[batch_idx]       
-    # print('Best Accuracy: {:.6f}'.format(best_acc))        
-    print('End evaluation, returning to training function.')      
-    model.train()
-    
-    return best_acc
 
 
 # 加载预训练参数，训练Resnet分类网络。
