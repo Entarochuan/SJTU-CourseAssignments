@@ -16,17 +16,23 @@
 
    - `result_HW1-1&Hw1_2`: HW1-1, HW1-2两部分的结果图。
 
-        
-
    - `HW1_3`:基于`paddle`框架实现的拼图模型、预训练Resnet参数保存和Resnet训练。
 
         - `Model.py`: 实现了拼图模型，图像切分函数， 模型精确度评估， Resnet。
-
         - `Train.py`: 实现了拼图模型的训练，将Resnet部分预训练函数存储并加载到Resnet模型中。
-
         - `Pretrained_Resnet`：保存预训练Resnet模型参数。
 
-             
+   - Reports: 三篇Report。
+
+           
+
+        
+
+        
+
+        
+
+           
 
 #### 2.1 回归问题
 
