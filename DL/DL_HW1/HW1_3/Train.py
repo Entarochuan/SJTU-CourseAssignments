@@ -127,7 +127,7 @@ if __name__ == "__main__":
     
     # Initialize Args
     args = Args.init_args(sys.argv[1:])
-    print(args)
+    # print(args)
     
     max_epoch = args.max_epoch
     batch_size = args.batch_size
@@ -136,6 +136,7 @@ if __name__ == "__main__":
     lr = args.lr
     data_path = args.data_path
     hidden_size = args.hidden_size
+    use_attention = args.use_attention
     
     # Pre-Settings
     random.seed(999)
@@ -149,9 +150,13 @@ if __name__ == "__main__":
     test_loader = paddle.io.DataLoader(cifar10_test_new, shuffle=True, batch_size=batch_size)
 
     # model initialization
-    model = Model.Stitch_Net(pic_num=4, cnn_hidden_size=hidden_size, batch_size=batch_size, use_attention=True)
+    model = Model.Stitch_Net(pic_num=4, cnn_hidden_size=hidden_size, batch_size=batch_size, use_attention=use_attention)
     loss = nn.CrossEntropyLoss()
     optimizer = paddle.optimizer.Adam(learning_rate=lr,parameters=model.parameters())
+    
+    # visualize
+    # model = paddle.Model(model)
+    # model.summary((256, 4, 3, 16, 16))
     
     """
     

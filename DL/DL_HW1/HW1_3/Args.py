@@ -33,5 +33,6 @@ def add_argument_base(arg_parser):
     arg_parser.add_argument('--lr', type=float, default=0.00005, help='learning rate')
     arg_parser.add_argument('--data_path', type=str, default='./cifar/cifar-10-batches-py', help='Path of data')
     arg_parser.add_argument('--hidden_size', type=int, default=256, help='CNN hidden size')
+    arg_parser.add_argument('--use_attention', type=bool, default=True, help='Use attention in Stitching Net')
     
     return arg_parser
