@@ -18,7 +18,7 @@ from spikingjelly.clock_driven import functional, surrogate, neuron
 from torchvision.datasets import CIFAR10
 import torchvision
 import torch.nn.functional as F
-
+import time
 
 def accuracy(y_hat, y):
     """计算预测正确的数量"""
@@ -60,47 +60,14 @@ def evaluation(model, test_loader, SNN=False):
     print('end evaluation.')
 
 
-# print(torch.cuda.is_available())
-# root_dir = './data/cifar_10'
-# transfrom = transforms.ToTensor()
-# train_set = CIFAR10DVS(root_dir, data_type='frame', frames_number=8, split_by='number')
-# test_set = CIFAR10DVS(root_dir, data_type='frame', frames_number=8, split_by='number')
-
-
-
-
-# transform = torchvision.transforms.Compose([
-#     torchvision.transforms.Resize((32, 32)),
-#     torchvision.transforms.ToTensor()]
-# )
-
-# # print(torch.cuda.is_available())
-# # print(torch.__version__)
-
-# train_set = CIFAR10(root='./data/origin_data/', train=True, transform=transform, download=True)
-# test_set  = CIFAR10(root='./data/origin_data/', train=False, transform=transform, download=True)
-# train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
-# test_loader = DataLoader(test_set, batch_size=batch_size*2, shuffle=True)
-
-# model = models.DVSGestureNet(channels=3, spiking_neuron=neuron.LIFNode, surrogate_function=surrogate.ATan(), detach_reset=True).to(device)
-# model = models.SNN_Net(tau=tau, T=T).to(device)
-
-# model = models.CNN_Net()
+def train_SNN(max_epoch, lr, batch_size, device):
     
- # trainloader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True)
-# testloader = torch.utils.data.DataLoader(test_set, batch_size=batch_size*2, shuffle=False)
-
-
-
-def train_SNN():
-    
-    device = 'cuda:0'
-    batch_size = 32
-    learning_rate = 5e-2
+    device = device
+    batch_size = batch_size
+    learning_rate = lr
     T = int(8)
     tau = float(2.0)
-    train_epoch = int(20)
-    log_dir = './log/'
+    train_epoch = max_epoch
 
     root_dir = './data/cifar_10'
     transfrom = transforms.ToTensor()
@@ -108,22 +75,24 @@ def train_SNN():
     test_set = CIFAR10DVS(root_dir, data_type='frame', frames_number=8, split_by='number')
     train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(test_set, batch_size=batch_size*2, shuffle=True)
-    model = models.SNN_Net(tau=tau, T=T)
+    model = models.SNN_Net(tau=tau, T=T).to(device)
+    # model = models.SNN_Net(tau=tau, T=T)
     optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
     loss = torch.nn.CrossEntropyLoss()
     
     for epoch in range(train_epoch):
         model.train()
+        time_start = time.time()
         for batch_idx, (frames, label) in enumerate(train_loader):
             # print(x)
-            print(frames.shape)
+            # print(frames.shape)
             if frames.shape[0] < 32:
                 break
             optimizer.zero_grad()
             frames = torch.tensor(frames, dtype = torch.float32)
-            # frames = frames.to(device)
+            frames = frames.to(device)
             frames = frames.transpose(0,1)
-            # label = label.to(device)
+            label = label.to(device)
             
             pred = model(frames)
             l = loss(pred, label)
@@ -132,25 +101,27 @@ def train_SNN():
             
             functional.reset_net(model)
             
-            if batch_idx % 50 == 0:
+            if (batch_idx+1) % 100 == 0:
                 # print(torch.cuda.get_device_capability(device))
                 print('Epoch: {} batch:[{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                     epoch+1, batch_idx, int(len(train_loader)),
                     100. * batch_idx / float(len(train_loader)), l.item()))
+                
+                time_end=time.time()
+                print('time cost of 100 batch',time_end-time_start,'s')
         
         evaluation(model, test_loader, SNN=True)   
         model.train()
 
     
-def train_CNN():
+def train_CNN(max_epoch, lr, batch_size, device):
     
-    device = 'cuda:0'
-    batch_size = 32
-    learning_rate = 5e-2
+    device = device
+    batch_size = batch_size
+    learning_rate = lr
     T = int(8)
     tau = float(2.0)
-    train_epoch = int(20)
-    log_dir = './log/'
+    train_epoch = max_epoch
     
     transform = torchvision.transforms.Compose([
     torchvision.transforms.Resize((32, 32)),
@@ -166,6 +137,7 @@ def train_CNN():
     
     for epoch in range(train_epoch):
         model.train()
+        time_start = time.time()
         for batch_idx, (frames, label) in enumerate(train_loader):
             
             optimizer.zero_grad()
@@ -178,11 +150,14 @@ def train_CNN():
             
             # functional.reset_net(model)
             
-            if batch_idx % 50 == 0:
+            if (batch_idx+1) % 100 == 0:
                 # print(torch.cuda.get_device_capability(device))
                 print('Epoch: {} batch:[{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                     epoch+1, batch_idx, int(len(train_loader)),
                     100. * batch_idx / float(len(train_loader)), l.item()))
+                
+                time_end=time.time()
+                print('time cost of 100 batch',time_end-time_start,'s')
         
         evaluation(model, test_loader)   
         model.train()
