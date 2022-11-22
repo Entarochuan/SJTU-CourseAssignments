@@ -121,7 +121,7 @@ sift = cv2.SIFT_create()
 for i in range(data.train_images.shape[0]):
     tep = cv2.normalize(data.train_images[i], None, 0, 255, cv2.NORM_MINMAX).astype('uint8')
     kp_vector, des_vector = sift.detectAndCompute(tep, None)
-
+    print(kp_vector)
     #####
     pass
     #####
