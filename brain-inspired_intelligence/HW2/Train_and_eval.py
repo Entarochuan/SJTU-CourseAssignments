@@ -95,7 +95,7 @@ def evaluation(model, test_loader):
             metric[1] = metric[1] + y.numel()
             accuracies.append(metric[0]/metric[1])
 
-            if batch_idx % 100 == 0:
+            if batch_idx % 50 == 0:
                 print('batch:[{}/{} ({:.0f}%)]\tAccuracy: {:.6f}'.format(
                     batch_idx, int(len(test_loader)),
                     100. * batch_idx / float(len(test_loader)), accuracies[batch_idx]))
@@ -109,7 +109,7 @@ transfrom = transforms.ToTensor()
 train_set = CIFAR10DVS(root_dir, data_type='frame', frames_number=8, split_by='number')
 test_set = CIFAR10DVS(root_dir, data_type='frame', frames_number=8, split_by='number')
 
-device = 0
+device = 'cuda:0'
 batch_size = 32
 learning_rate = 5e-2
 T = int(8)
@@ -132,8 +132,8 @@ train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
 test_loader = DataLoader(test_set, batch_size=batch_size*2, shuffle=True)
 
 # model = models.DVSGestureNet(channels=3, spiking_neuron=neuron.LIFNode, surrogate_function=surrogate.ATan(), detach_reset=True).to(device)
-model = models.SNN_Net(tau=tau, T=T).to(device)
-
+# model = models.SNN_Net(tau=tau, T=T).to(device)
+model = models.SNN_Net(tau=tau, T=T)
 # model = models.CNN_Net()
     
 # train_set, test_set = split_to_train_test_set(0.9, train_set, 10)
@@ -147,14 +147,14 @@ for epoch in range(train_epoch):
     model.train()
     for batch_idx, (frames, label) in enumerate(train_loader):
         # print(x)
-        # print(frames.shape)
+        print(frames.shape)
         if frames.shape[0] < 32:
             break
         optimizer.zero_grad()
         frames = torch.tensor(frames, dtype = torch.float32)
-        frames = frames.to(device)
+        # frames = frames.to(device)
         frames = frames.transpose(0,1)
-        label = label.to(device)
+        # label = label.to(device)
         
         pred = model(frames)
         l = loss(pred, label)
