@@ -116,15 +116,27 @@ data.load()
 # 如果有需要，你也可以在pass之外的地方填写相关代码，请自便，下同。
 # vec_dict 第i项： i为类别，对应的字典为所有属于该类的sift特征点的信息。注意：kp与des一一对应。
 vec_dict = {i:{'kp':[], 'des':[]} for i in range(102)}
-
+# des 为128维度的描述向量
+# 102 是数据集的类别个数...QAQ
 sift = cv2.SIFT_create()
+# print(data.train_images.shape[0])  # 6400
 for i in range(data.train_images.shape[0]):
+    # if i==10:
+    #     break
     tep = cv2.normalize(data.train_images[i], None, 0, 255, cv2.NORM_MINMAX).astype('uint8')
     kp_vector, des_vector = sift.detectAndCompute(tep, None)
-    print(kp_vector)
-    #####
-    pass
-    #####
+    class_num = data.train_lb[i]
+    
+    kp_vector = list(kp_vector)
+    des_vector = list(des_vector)
+    vec_dict[class_num]['kp'].extend(kp_vector)
+    # print(len(vec_dict[class_num]['kp']))
+    vec_dict[class_num]['des'].extend(des_vector)
+    # print(len(vec_dict[class_num]['kp']))
+    
+    # print(len(des_vector[0]))
+
+# print(vec_dict)
 
 
 # 统计最少特征点的类别
@@ -142,31 +154,43 @@ for i in range(102):
 # TODO 为每个类别选择同样多的特征点用于聚类。特征点个数bneck_value
 
 vec_list = vec_dict[0]['des'][0:bneck_value]
+# print(bneck_value) 3379
 for i in range(1, 102):
-    #####
-    pass
-    #####
+    vec_list = vec_list + vec_dict[i]['des'][0:bneck_value]
 vec_list = np.float64(vec_list)
+# print(vec_list.shape) (344658, 128)
 
 
-
-# TODO 对提取出的特征点使用Kmeans聚类，设定合适的聚类中心个数
 from sklearn.cluster import KMeans
 #####
-N_clusters = 0
-pass
+N_clusters = 200  # just 4 try
+kmeans = KMeans(n_clusters=N_clusters)
+kmeans.fit(vec_list)
 #####
+   
 
 
 # TODO 利用直方图统计每张图像中的特征点所属聚类中心的个数，将直方图归一化后便得到图像的特征向量。
 num_images = data.train_images.shape[0]
 hist_vector = np.zeros((num_images, N_clusters))
 for i in range(num_images):
+    # if i == 2:
+    #     break
     tep = cv2.normalize(data.train_images[i], None, 0, 255, cv2.NORM_MINMAX).astype('uint8')
-    #####
-    pass
-    #####
+    kp_vector, des_vector = sift.detectAndCompute(tep, None)
+    des_vector = np.array(des_vector, dtype=np.float64)
+    label_test = kmeans.predict(des_vector)
+    # print(label_test)
+    for label in label_test:
+        hist_vector[i][label] = hist_vector[i][label] + 1
+    
+    # dst = np.zeros_like(hist_vector[i])
+    # print(hist_vector)
 
+    # print(hist_vector[i])
+    cv2.normalize(hist_vector[i], hist_vector[i], 0, 255, cv2.NORM_MINMAX)
+    # print(hist_vector[i])
+# print(hist_vector[1])
 
 # 使用SVM构建分类器
 # 你可以自行构建分类器，也可以使用SVM
@@ -177,12 +201,22 @@ classifier.fit(hist_vector, data.train_lb)
 # TODO 构建测试集并计算模型准确率
 num_test_images = data.test_images.shape[0]
 hist_test_vector = np.zeros((num_test_images, N_clusters))
+# print(num_test_images)
 for i in range(num_test_images):
+    # if i==100:
+    #     break
     tep = cv2.normalize(data.test_images[i], None, 0, 255, cv2.NORM_MINMAX).astype('uint8')
-
-    #####
-    pass
-    #####
+    kp_vector, des_vector = sift.detectAndCompute(tep, None)
+    des_vector = np.array(des_vector, dtype=np.float64)
+    
+    label_pred_test = kmeans.predict(des_vector)
+    # label_pred_test = classifier.predict(vec_test)
+    for label in label_pred_test:
+        hist_test_vector[i][label] = hist_test_vector[i][label] + 1
+        
+    cv2.normalize(hist_test_vector[i], hist_test_vector[i], 0, 255, cv2.NORM_MINMAX)
+    # print(hist_test_vector[i])
+    # print()
 
 
 acc = classifier.predict(hist_test_vector)-data.test_lb
