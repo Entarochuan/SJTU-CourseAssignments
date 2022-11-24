@@ -47,9 +47,6 @@ def main():
     lr = args.lr
     max_epoch = args.max_epoch
     
-    # 下面的参数是为SNN定义的
-    T = int(8)
-    tau = float(2.0)
     
     if args.choose_net == 'SNN':
         Train_funcs.train_SNN(max_epoch, lr, batch_size, device)
