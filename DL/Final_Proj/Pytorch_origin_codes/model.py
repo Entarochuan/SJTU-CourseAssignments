@@ -50,25 +50,11 @@ pygm.BACKEND = 'pytorch' # set default backend for pygmtools
 #
 # The images are resized to 256x256.
 #
-
-ds_dict = {
-    'ROOT_DIR' : './data/', 
-}
-
-dataset = pygm.dataset.WillowObject(sets='train', obj_resize=(256, 256), ds_dict=ds_dict)
-
-
-
 obj_resize = (256, 256)
 img1 = Image.open('./data/Duck/060_0001.png')
 img2 = Image.open('./data/Duck/060_0002.png')
 kpts1 = torch.tensor(sio.loadmat('./data/Duck/060_0001.mat')['pts_coord'])
 kpts2 = torch.tensor(sio.loadmat('./data/Duck/060_0002.mat')['pts_coord'])
-# img1 = Image.open('../data/willow_duck_0001.png')
-# img2 = Image.open('../data/willow_duck_0002.png')
-# kpts1 = torch.tensor(sio.loadmat('../data/willow_duck_0001.mat')['pts_coord'])
-# kpts2 = torch.tensor(sio.loadmat('../data/willow_duck_0002.mat')['pts_coord'])
-
 kpts1[0] = kpts1[0] * obj_resize[0] / img1.size[0]
 kpts1[1] = kpts1[1] * obj_resize[1] / img1.size[1]
 kpts2[0] = kpts2[0] * obj_resize[0] / img2.size[0]
