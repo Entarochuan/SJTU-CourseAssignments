@@ -23,21 +23,3 @@
 + `utils/batch.py`:将数据以批为单位转化为输入
 + `model/slu_baseline_tagging.py`:baseline模型
 + `scripts/slu_baseline.py`:主程序脚本
-
-### 有关预训练语言模型
-
-本次代码中没有加入有关预训练语言模型的代码，如需使用预训练语言模型我们推荐使用下面几个预训练模型，若使用预训练语言模型，不要使用large级别的模型
-+ Bert: https://huggingface.co/bert-base-chinese
-+ Bert-WWM: https://huggingface.co/hfl/chinese-bert-wwm-ext
-+ Roberta-WWM: https://huggingface.co/hfl/chinese-roberta-wwm-ext
-+ MacBert: https://huggingface.co/hfl/chinese-macbert-base
-
-### 推荐使用的工具库
-+ transformers
-  + 使用预训练语言模型的工具库: https://huggingface.co/
-+ nltk
-  + 强力的NLP工具库: https://www.nltk.org/
-+ stanza
-  + 强力的NLP工具库: https://stanfordnlp.github.io/stanza/
-+ jieba
-  + 中文分词工具: https://github.com/fxsjy/jieba
